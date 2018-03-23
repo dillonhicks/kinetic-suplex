@@ -101,8 +101,6 @@ func (s *StreamBufferCache) runEventLoop() {
 		select {
 		case msg := <-istreamChannel:
 			s.sequenceNumber++
-			msg = fmt.Sprintf("[cache:%v] [%.2f rps] %v %v %v",
-				s.partitionKey, stats.CurrentRps(), s.sequenceNumber, time.Now(), msg)
 
 			if now.After(nextSend) {
 				fmt.Println(fmt.Sprintf("[cache:%v] [%.2f rps] [%v conns] tick: %v",

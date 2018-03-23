@@ -15,6 +15,11 @@ import (
 	"kineticsuplex/goro/consts"
 )
 
+
+const (
+	TaskletDoneSentinel = "GoroTaskletDoneSentinel-20180322"
+)
+
 var goroSingleton *GoroStreamDemuxer = nil
 
 
@@ -229,6 +234,7 @@ func runShardTasklet(ctrlChan <-chan int, ackChan chan<- int, kns *kinesis.Kines
 
 	dropCount := 0
 	warnDropEvery := 100
+	partitionsObserved := make(map[string]bool)
 
 	for {
 		fmt.Println(fmt.Sprintf("[TASKLET] [INFO ] - %s/%s: Getting stream records", shortStreamName, shortShardId))
@@ -236,9 +242,17 @@ func runShardTasklet(ctrlChan <-chan int, ackChan chan<- int, kns *kinesis.Kines
 		select {
 
 		case <-ctrlChan:
-			fmt.Println(fmt.Sprintf("[TASKLET] [STOP ] - %s/%s: Received shutdown ctrl msg", shortStreamName, shortShardId))
+			fmt.Println(fmt.Sprintf("[TASKLET] [ALERT] - %s/%s: Received shutdown ctrl msg", shortStreamName, shortShardId))
+
+			for pKey := range partitionsObserved {
+				if ch := getChannel(pKey); ch != nil {
+					fmt.Println(fmt.Sprintf("[TASKLET] [INFO ] - %s/%s: Sending sentinel to partition channel %s", shortStreamName, shortShardId, pKey))
+					ch <- TaskletDoneSentinel
+				}
+			}
+			fmt.Println(fmt.Sprintf("[TASKLET] [HALT ] - %s/%s: Tasklet stopped successfully - reporting back to parent task", shortStreamName, shortShardId))
 			ackChan <- 1
-			break
+			return
 		default:
 			// fall through
 		}
@@ -246,6 +260,11 @@ func runShardTasklet(ctrlChan <-chan int, ackChan chan<- int, kns *kinesis.Kines
 		recordsResponse, err = getNextRecordsBatch(recordsResponse, kns, &streamName, &shardId);
 		if err != nil {
 			fmt.Println(fmt.Sprintf("[TASKLET] [ERROR] - %s/%s: %v", shortStreamName, shortShardId, err))
+			for pKey := range partitionsObserved {
+				if ch := getChannel(pKey); ch != nil {
+					ch <- TaskletDoneSentinel
+				}
+			}
 			ackChan <- 1
 			return
 		}
@@ -258,6 +277,8 @@ func runShardTasklet(ctrlChan <-chan int, ackChan chan<- int, kns *kinesis.Kines
 		}
 
 		for _, record := range recordsResponse.Records {
+			partitionsObserved[*record.PartitionKey] = true
+
 			recordCounter++
 			if ch := getChannel(*record.PartitionKey); ch != nil {
 				ch <- string(record.Data)

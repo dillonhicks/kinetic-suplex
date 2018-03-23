@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"errors"
+	"strings"
 )
 
 var addr = flag.String("addr", "localhost:8000", "http service address")
@@ -24,16 +25,16 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 
 	streamName := "STREAMNAMENOTSET"
-	partitionKey := "PARTITIONKEYNOTSET"
 
 	if len(os.Args) > 1 {
 		streamName = os.Args[1]
-		partitionKey = os.Args[2]
 	} else {
 		panic(errors.New("Not enough arguements"))
 	}
 
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/ws/" + streamName +"/" + partitionKey}
+	u := url.URL{Scheme: "ws", Host: *addr, Path: "/ws/" + streamName}
+	u.RawQuery = "keys="+strings.Join(os.Args[2:], ",")
+
 	log.Printf("connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)

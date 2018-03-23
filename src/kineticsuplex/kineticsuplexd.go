@@ -22,6 +22,7 @@ func main() {
 	go kintaroServer.Run("", 8000)
 	<-sigChan
 	goro.Shutdown()
+	kintaroServer.Shutdown()
 	goro.Wait()
-
+	kintaroServer.Wait()
 }

@@ -18,6 +18,15 @@ const (
 
 
 
+const (
+	ServerStateInitializing int64 = iota
+	ServerStateRunning
+	ServerStateStopping
+	ServerStateTerminated
+)
+
+
+
 
 const (
 	BufferCacheSize                         = 1024 // in entries / log lines
